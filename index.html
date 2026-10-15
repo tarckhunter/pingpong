@@ -6,6 +6,7 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#090e1b">
 <title>Pocket Pong — Power Battle</title>
+
 <style>
   :root {
     color-scheme: dark;
@@ -31,6 +32,7 @@
 
   .app {
     width: min(100%, 500px);
+    height: 100vh;
     height: 100svh;
     margin: auto;
     padding:
@@ -56,11 +58,7 @@
   }
 
   h1 span { color: var(--mint); }
-
-  .small {
-    font-size: 11px;
-    color: var(--muted);
-  }
+  .small { font-size: 11px; color: var(--muted); }
 
   .scoreboard {
     display: grid;
@@ -82,11 +80,7 @@
 
   .player { color: var(--mint); }
   .computer { color: var(--pink); text-align: right; }
-
-  .mini-power {
-    font-size: 10px;
-    min-height: 15px;
-  }
+  .mini-power { font-size: 10px; min-height: 15px; }
 
   .court-space {
     flex: 1;
@@ -147,7 +141,11 @@
     padding: 8px 12px;
   }
 
-  button { cursor: pointer; touch-action: manipulation; }
+  button {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
   button:disabled { cursor: not-allowed; }
 
   button:focus-visible,
@@ -303,9 +301,38 @@
     background: var(--mint);
   }
 
-  .actions { display: flex; gap: 7px; flex-shrink: 0; }
+  .actions {
+    display: flex;
+    gap: 7px;
+    flex-shrink: 0;
+  }
+
   .actions button { flex: 1; font-size: 13px; }
   .actions select { min-width: 82px; font-size: 12px; }
+
+  .mode-switch {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    min-height: 42px;
+    padding: 7px 10px;
+    border: 1px solid #665025;
+    border-radius: 10px;
+    background: #2b2315;
+    color: var(--gold);
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .mode-switch input {
+    width: 19px;
+    height: 19px;
+    margin: 0;
+    accent-color: var(--gold);
+    flex-shrink: 0;
+  }
 
   .hint {
     margin: 0;
@@ -351,7 +378,9 @@
       คุณ <strong id="playerScore">0</strong>
       <div class="mini-power" id="playerPowerText">POWER 0%</div>
     </div>
+
     <span class="small">7 แต้มชนะ</span>
+
     <div class="computer">
       คอม <strong id="aiScore">0</strong>
       <div class="mini-power" id="aiPowerText">POWER 0%</div>
@@ -374,7 +403,7 @@
           <p id="overlayText">คุณอยู่ด้านล่าง ใช้สไลด์เลื่อนไม้
 รับลูก 5 ครั้งเพื่อชาร์จพลังเต็ม
 กด Power Shoot แล้วตีลูกครั้งถัดไป
-ระวัง! คอมก็ยิงพลังได้เหมือนกัน</p>
+หรือเปิด POWER ทั้งเกม เพื่อยิงพลังทุกลูก!</p>
           <button class="primary" id="playButton">เริ่มเกม</button>
         </div>
       </div>
@@ -387,6 +416,7 @@
         <span>พลังสะสมของคุณ</span>
         <strong id="energyText">0%</strong>
       </div>
+
       <div
         class="energy-track"
         id="energyMeter"
@@ -399,6 +429,7 @@
         <div class="energy-fill" id="energyFill"></div>
       </div>
     </div>
+
     <button class="power-button" id="powerButton" disabled>
       ⚡ POWER SHOOT
     </button>
@@ -409,6 +440,7 @@
       ← เลื่อนไม้ของคุณ →
       <span>SLIDE CONTROL</span>
     </label>
+
     <input
       id="slider"
       type="range"
@@ -423,6 +455,7 @@
   <div class="actions">
     <button id="pauseButton">เริ่มเกม</button>
     <button id="restartButton">เริ่มใหม่</button>
+
     <select id="difficulty" aria-label="ความยาก เปลี่ยนแล้วเริ่มเกมใหม่">
       <option value="easy">ง่าย</option>
       <option value="normal" selected>ปกติ</option>
@@ -430,9 +463,15 @@
     </select>
   </div>
 
+  <label class="mode-switch">
+    <input id="alwaysPower" type="checkbox">
+    <span>⚡ POWER ทั้งเกม — ทั้งสองฝ่ายยิงพลังทุกลูก</span>
+  </label>
+
   <p class="hint">
     รับลูก +20% · ← → / A D เคลื่อนที่ · P ใช้พลัง · Space พัก
   </p>
+
   <div id="announcement" class="sr-only"
        role="status" aria-live="polite"></div>
 </main>
@@ -445,6 +484,7 @@
   const canvas = $("canvas");
   const ctx = canvas.getContext("2d");
   const slider = $("slider");
+  const alwaysPower = $("alwaysPower");
 
   if (!ctx) {
     $("overlayTitle").textContent = "ไม่รองรับ Canvas";
@@ -452,8 +492,12 @@
     return;
   }
 
-  const W = 420, H = 660;
-  const PW = 88, PH = 13, R = 8;
+  // ขนาดสนามและกติกาเดิม
+  const W = 420;
+  const H = 660;
+  const PW = 88;
+  const PH = 13;
+  const R = 8;
   const MAX_X = W - PW;
   const WIN_SCORE = 7;
   const CHARGE = 20;
@@ -467,18 +511,26 @@
   };
 
   const player = {
-    x: MAX_X / 2, y: H - 52,
-    score: 0, energy: 0, armed: false
+    x: MAX_X / 2,
+    y: H - 52,
+    score: 0,
+    energy: 0,
+    armed: false
   };
 
   const ai = {
-    x: MAX_X / 2, y: 31,
-    score: 0, energy: 0, armed: false
+    x: MAX_X / 2,
+    y: 31,
+    score: 0,
+    energy: 0,
+    armed: false
   };
 
   const ball = {
-    x: W / 2, y: H / 2,
-    vx: 0, vy: 0,
+    x: W / 2,
+    y: H / 2,
+    vx: 0,
+    vy: 0,
     speed: 340,
     normalSpeed: 340,
     powerOwner: null
@@ -503,10 +555,13 @@
     "(prefers-reduced-motion: reduce)"
   ).matches;
 
-  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const clamp = (value, min, max) =>
+    Math.max(min, Math.min(max, value));
+
   const settings = () => levels[$("difficulty").value];
-  const moveToward = (v, target, step) =>
-    v + clamp(target - v, -step, step);
+
+  const moveToward = (value, target, step) =>
+    value + clamp(target - value, -step, step);
 
   function announce(text) {
     $("announcement").textContent = text;
@@ -518,6 +573,7 @@
 
   function setPlayerX(x) {
     player.x = clamp(x, 0, MAX_X);
+
     const percent = player.x / MAX_X * 100;
     slider.value = String(Math.round(percent * 10));
     slider.style.setProperty("--position", percent + "%");
@@ -526,34 +582,59 @@
   function updateScores() {
     $("playerScore").textContent = player.score;
     $("aiScore").textContent = ai.score;
+
     announce(`คุณ ${player.score} คะแนน คอม ${ai.score} คะแนน`);
   }
 
   function syncPowerUI() {
-    const usable = state === "playing" &&
-      player.energy === 100 && !player.armed;
+    const unlimited = alwaysPower.checked;
+    const displayEnergy = unlimited ? 100 : player.energy;
 
-    $("energyText").textContent = player.energy + "%";
-    $("energyFill").style.width = player.energy + "%";
+    const usable =
+      !unlimited &&
+      state === "playing" &&
+      player.energy === 100 &&
+      !player.armed;
+
+    $("energyText").textContent = unlimited
+      ? "∞ POWER"
+      : player.energy + "%";
+
+    $("energyFill").style.width = displayEnergy + "%";
+
     $("energyMeter").setAttribute(
-      "aria-valuenow", String(player.energy)
+      "aria-valuenow",
+      String(displayEnergy)
     );
 
-    $("playerPowerText").textContent = player.armed
-      ? "⚡ พร้อมยิง!"
-      : `POWER ${player.energy}%`;
+    $("energyMeter").setAttribute(
+      "aria-valuetext",
+      unlimited ? "พลังไม่จำกัด" : `${player.energy}%`
+    );
 
-    $("aiPowerText").textContent = ai.armed
-      ? "⚡ พร้อมยิง!"
-      : `POWER ${ai.energy}%`;
+    $("playerPowerText").textContent = unlimited
+      ? "⚡ POWER ∞"
+      : player.armed
+        ? "⚡ พร้อมยิง!"
+        : `POWER ${player.energy}%`;
+
+    $("aiPowerText").textContent = unlimited
+      ? "⚡ POWER ∞"
+      : ai.armed
+        ? "⚡ พร้อมยิง!"
+        : `POWER ${ai.energy}%`;
 
     const button = $("powerButton");
+
     button.disabled = !usable;
-    button.classList.toggle("ready", usable);
-    button.classList.toggle("armed", player.armed);
-    button.textContent = player.armed
-      ? "⚡ พร้อมยิงลูกถัดไป"
-      : "⚡ POWER SHOOT";
+    button.classList.toggle("ready", unlimited || usable);
+    button.classList.toggle("armed", !unlimited && player.armed);
+
+    button.textContent = unlimited
+      ? "⚡ AUTO POWER ∞"
+      : player.armed
+        ? "⚡ พร้อมยิงลูกถัดไป"
+        : "⚡ POWER SHOOT";
   }
 
   function showFloating(text, color = "#ffd365") {
@@ -563,10 +644,10 @@
   }
 
   function chargePower(paddle) {
-    const old = paddle.energy;
+    const previous = paddle.energy;
     paddle.energy = Math.min(100, paddle.energy + CHARGE);
 
-    if (paddle.energy === 100 && old < 100) {
+    if (paddle.energy === 100 && previous < 100) {
       if (paddle === player) {
         showFloating("POWER READY!");
         announce("พลังคุณเต็มแล้ว กด Power Shoot เพื่อเตรียมยิง");
@@ -580,6 +661,8 @@
   }
 
   function armPlayerPower() {
+    if (alwaysPower.checked) return;
+
     if (
       state !== "playing" ||
       player.energy < 100 ||
@@ -593,6 +676,8 @@
   }
 
   function prepareAIPower() {
+    if (alwaysPower.checked) return;
+
     if (
       state === "playing" &&
       serveDelay <= 0 &&
@@ -645,6 +730,7 @@
     updateScores();
     resetBall(1);
 
+    // คงโหมดที่ผู้เล่นเลือกไว้
     state = "playing";
     $("overlay").hidden = true;
     $("pauseButton").textContent = "พักเกม";
@@ -653,11 +739,18 @@
 
   function pauseGame() {
     keys.clear();
+
     if (state !== "playing") return;
 
     state = "paused";
     $("pauseButton").textContent = "เล่นต่อ";
-    showOverlay("พักเกม", "พลังสะสมยังอยู่ พร้อมแล้วกดเล่นต่อ", "เล่นต่อ");
+
+    showOverlay(
+      "พักเกม",
+      "พลังสะสมยังอยู่ พร้อมแล้วกดเล่นต่อ",
+      "เล่นต่อ"
+    );
+
     syncPowerUI();
   }
 
@@ -683,7 +776,8 @@
       const life = powerful ? 0.6 : 0.35;
 
       particles.push({
-        x, y,
+        x,
+        y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life,
@@ -695,16 +789,19 @@
 
   function bounce(paddle, direction) {
     const isPlayer = paddle === player;
-    const usePower = paddle.armed && paddle.energy === 100;
+    const unlimited = alwaysPower.checked;
+
+    const usePower = unlimited ||
+      (paddle.armed && paddle.energy === 100);
 
     const hit = clamp(
       (ball.x - (paddle.x + PW / 2)) / (PW / 2),
-      -1, 1
+      -1,
+      1
     );
 
     const angle = hit * Math.PI / 3;
 
-    // ความเร็วพื้นฐานแยกจากความเร็วพลังพิเศษ
     ball.normalSpeed = Math.min(
       ball.normalSpeed * 1.045,
       MAX_NORMAL_SPEED
@@ -719,8 +816,12 @@
       : ball.normalSpeed;
 
     if (usePower) {
-      paddle.energy = 0;
-      paddle.armed = false;
+      // โหมดทั้งเกมไม่ใช้พลังสะสม
+      if (!unlimited) {
+        paddle.energy = 0;
+        paddle.armed = false;
+      }
+
       flash = reducedMotion ? 0 : 0.22;
       flashRGB = isPlayer ? "255,211,101" : "255,101,179";
 
@@ -729,9 +830,13 @@
         isPlayer ? "#ffd365" : "#ff8dbd"
       );
 
-      announce(isPlayer
-        ? "คุณปล่อย Power Shoot"
-        : "คอมพิวเตอร์ยิง Power Shoot");
+      if (!unlimited) {
+        announce(
+          isPlayer
+            ? "คุณปล่อย Power Shoot"
+            : "คอมพิวเตอร์ยิง Power Shoot"
+        );
+      }
 
       syncPowerUI();
     } else {
@@ -761,7 +866,7 @@
     winner.score++;
     updateScores();
 
-    // พลังเก็บข้ามแต้ม แต่ต้องเตรียมยิงใหม่
+    // พลังเก็บข้ามแต้ม แต่ยกเลิกสถานะเตรียมยิง
     player.armed = false;
     ai.armed = false;
 
@@ -800,11 +905,13 @@
 
     if (left || right) {
       setPlayerX(
-        player.x + ((right ? 1 : 0) - (left ? 1 : 0)) * 440 * dt
+        player.x +
+        ((right ? 1 : 0) - (left ? 1 : 0)) * 440 * dt
       );
     }
 
     aiTimer -= dt;
+
     if (aiTimer <= 0) {
       aiError = (Math.random() - 0.5) * settings().error * 2;
       aiTimer = 0.28;
@@ -816,7 +923,8 @@
 
     ai.x = clamp(
       moveToward(ai.x, target, settings().aiSpeed * dt),
-      0, MAX_X
+      0,
+      MAX_X
     );
 
     particles.forEach(p => {
@@ -824,6 +932,7 @@
       p.y += p.vy * dt;
       p.life -= dt;
     });
+
     particles = particles.filter(p => p.life > 0);
 
     if (serveDelay > 0) {
@@ -842,10 +951,12 @@
     const maxTrail = ball.powerOwner ? 18 : 10;
     if (trail.length > maxTrail) trail.length = maxTrail;
 
-    // ย่อยการเคลื่อนที่ ป้องกันลูกเร็วทะลุไม้
+    // ย่อยการเคลื่อนที่เพื่อป้องกันลูกเร็วทะลุไม้
     const steps = Math.max(
-      1, Math.ceil(MAX_POWER_SPEED * dt / 4)
+      1,
+      Math.ceil(MAX_POWER_SPEED * dt / 4)
     );
+
     const step = dt / steps;
 
     for (let i = 0; i < steps; i++) {
@@ -893,9 +1004,13 @@
   }
 
   function drawPaddle(paddle, isPlayer) {
+    const unlimited = alwaysPower.checked;
+    const active = unlimited || paddle.armed;
+    const displayEnergy = unlimited ? 100 : paddle.energy;
+
     const color = isPlayer
-      ? (paddle.armed ? "#ffd365" : "#65f5dd")
-      : (paddle.armed ? "#ffb6dc" : "#ff8dbd");
+      ? (active ? "#ffd365" : "#65f5dd")
+      : (active ? "#ffb6dc" : "#ff8dbd");
 
     ctx.save();
     ctx.fillStyle = color;
@@ -904,7 +1019,7 @@
     ctx.fillRect(paddle.x, paddle.y, PW, PH);
     ctx.restore();
 
-    // แถบพลังอยู่บนผิวไม้
+    // แถบชาร์จบนไม้
     const x = paddle.x + 4;
     const y = paddle.y + 4;
     const width = PW - 8;
@@ -912,29 +1027,37 @@
     ctx.fillStyle = isPlayer ? "#082c30" : "#482039";
     ctx.fillRect(x, y, width, 5);
 
-    if (paddle.energy > 0) {
+    if (displayEnergy > 0) {
       ctx.save();
-      ctx.globalAlpha = paddle.energy === 100 && !reducedMotion
-        ? 0.7 + Math.sin(gameTime * 9) * 0.3
-        : 1;
+
+      ctx.globalAlpha =
+        displayEnergy === 100 && !reducedMotion
+          ? 0.7 + Math.sin(gameTime * 9) * 0.3
+          : 1;
 
       ctx.fillStyle = isPlayer ? "#ffd365" : "#ffe0f2";
       ctx.shadowColor = isPlayer ? "#ffd365" : "#ff65b3";
-      ctx.shadowBlur = paddle.energy === 100 ? 14 : 0;
-      ctx.fillRect(x, y, width * paddle.energy / 100, 5);
+      ctx.shadowBlur = displayEnergy === 100 ? 14 : 0;
+
+      ctx.fillRect(x, y, width * displayEnergy / 100, 5);
       ctx.restore();
     }
 
     ctx.font = "bold 10px system-ui";
     ctx.textAlign = "center";
     ctx.fillStyle = isPlayer ? "#d6e6b0" : "#e9b9d2";
+
     ctx.fillText(
-      paddle.armed ? "POWER ARMED" : `POWER ${paddle.energy}%`,
+      unlimited
+        ? "POWER ∞"
+        : paddle.armed
+          ? "POWER ARMED"
+          : `POWER ${paddle.energy}%`,
       paddle.x + PW / 2,
       paddle.y + PH + 17
     );
 
-    if (paddle.armed) {
+    if (active) {
       ctx.save();
       ctx.strokeStyle = isPlayer ? "#ffe7a8" : "#ffe0f2";
       ctx.shadowColor = color;
@@ -950,10 +1073,21 @@
     ctx.fillStyle = "#0c1424";
     ctx.fillRect(0, 0, W, H);
 
+    const unlimited = alwaysPower.checked;
     const gradient = ctx.createLinearGradient(0, 0, 0, H);
-    gradient.addColorStop(0, ai.armed ? "#ff65b322" : "#ff8dbd0d");
+
+    gradient.addColorStop(
+      0,
+      unlimited || ai.armed ? "#ff65b322" : "#ff8dbd0d"
+    );
+
     gradient.addColorStop(0.5, "#0c1424");
-    gradient.addColorStop(1, player.armed ? "#ffd36522" : "#65f5dd0d");
+
+    gradient.addColorStop(
+      1,
+      unlimited || player.armed ? "#ffd36522" : "#65f5dd0d"
+    );
+
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, W, H);
 
@@ -965,10 +1099,12 @@
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
     }
+
     for (let y = 30; y < H; y += 30) {
       ctx.moveTo(0, y);
       ctx.lineTo(W, y);
     }
+
     ctx.stroke();
 
     ctx.save();
@@ -996,16 +1132,24 @@
     if (!reducedMotion) {
       trail.forEach((p, i) => {
         const fraction = 1 - i / trail.length;
+
         ctx.globalAlpha = fraction * (p.owner ? 0.65 : 0.25);
         ctx.fillStyle = p.owner
           ? (p.owner === "ai" ? "#ff65b3" : "#ffc247")
           : "#c8e9ff";
 
         ctx.beginPath();
-        ctx.arc(p.x, p.y, R * Math.max(0.15, fraction), 0, Math.PI * 2);
+        ctx.arc(
+          p.x,
+          p.y,
+          R * Math.max(0.15, fraction),
+          0,
+          Math.PI * 2
+        );
         ctx.fill();
       });
     }
+
     ctx.globalAlpha = 1;
 
     const powered = Boolean(ball.powerOwner);
@@ -1013,11 +1157,14 @@
     const powerColor = aiShot ? "#ff65b3" : "#ffbd42";
 
     ctx.save();
+
     ctx.fillStyle = powered
       ? (aiShot ? "#ffe0f2" : "#fff1b8")
       : "#ffffff";
+
     ctx.shadowColor = powered ? powerColor : "#bcecff";
     ctx.shadowBlur = powered ? 30 : 18;
+
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, powered ? R + 2 : R, 0, Math.PI * 2);
     ctx.fill();
@@ -1029,6 +1176,7 @@
       ctx.arc(ball.x, ball.y, R + 6, 0, Math.PI * 2);
       ctx.stroke();
     }
+
     ctx.restore();
 
     particles.forEach(p => {
@@ -1036,6 +1184,7 @@
       ctx.fillStyle = p.color;
       ctx.fillRect(p.x, p.y, 3, 3);
     });
+
     ctx.globalAlpha = 1;
 
     if (flash > 0) {
@@ -1076,11 +1225,34 @@
     court.style.height = H * scale + "px";
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
     canvas.width = Math.max(1, Math.round(W * scale * dpr));
     canvas.height = Math.max(1, Math.round(H * scale * dpr));
-    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+
+    ctx.setTransform(
+      canvas.width / W,
+      0,
+      0,
+      canvas.height / H,
+      0,
+      0
+    );
+
     draw();
   }
+
+  // เปิด–ปิดโหมดโดยไม่รีเซ็ตคะแนนหรือพลังสะสม
+  // ลูกที่กำลังบินจะคงสภาพเดิมจนกว่าจะชนไม้ครั้งถัดไป
+  alwaysPower.addEventListener("change", () => {
+    syncPowerUI();
+
+    const message = alwaysPower.checked
+      ? "เปิด POWER ทั้งเกม!"
+      : "กลับสู่โหมดสะสมพลัง";
+
+    showFloating(message);
+    announce(message);
+  });
 
   slider.addEventListener("input", () => {
     setPlayerX(Number(slider.value) / 1000 * MAX_X);
@@ -1088,8 +1260,12 @@
 
   function controlFromPointer(event) {
     if (state !== "playing") return;
+
     const rect = canvas.getBoundingClientRect();
-    setPlayerX((event.clientX - rect.left) / rect.width * W - PW / 2);
+
+    setPlayerX(
+      (event.clientX - rect.left) / rect.width * W - PW / 2
+    );
   }
 
   canvas.addEventListener("pointerdown", event => {
@@ -1107,8 +1283,13 @@
   window.addEventListener("keydown", event => {
     const key = event.key.toLowerCase();
     const target = event.target;
-    const editable = target.closest("textarea, [contenteditable='true']") ||
-      (target.matches("input") && target.type !== "range");
+
+    const editable =
+      target.closest("textarea, [contenteditable='true']") ||
+      (
+        target.matches("input") &&
+        !["range", "checkbox"].includes(target.type)
+      );
 
     if (editable) return;
 
@@ -1118,7 +1299,7 @@
       return;
     }
 
-    // ลูกศรบนสไลด์ยังทำงานตามมาตรฐานของเบราว์เซอร์
+    // คงการควบคุมปุ่มและ input ด้วยคีย์บอร์ดตามปกติ
     if (target.closest("input, select, button")) return;
 
     if (["arrowleft", "arrowright", "a", "d"].includes(key)) {
@@ -1154,8 +1335,12 @@
   $("restartButton").addEventListener("click", () => {
     if (state === "playing" || state === "paused") {
       pauseGame();
-      if (!confirm("เริ่มใหม่และล้างคะแนนกับพลังสะสมใช่ไหม?")) return;
+
+      if (!confirm("เริ่มใหม่และล้างคะแนนกับพลังสะสมใช่ไหม?")) {
+        return;
+      }
     }
+
     startGame();
     focusCourt();
   });
@@ -1181,6 +1366,7 @@
   function loop(time) {
     const dt = Math.min((time - lastTime) / 1000 || 0, 0.035);
     lastTime = time;
+
     update(dt);
     draw();
     requestAnimationFrame(loop);
@@ -1193,4 +1379,4 @@
 })();
 </script>
 </body>
-  </html>
+      </html>
