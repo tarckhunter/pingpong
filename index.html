@@ -1,1 +1,1196 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090e1b">
+<title>Pocket Pong — Power Battle</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --mint: #65f5dd;
+    --pink: #ff8dbd;
+    --gold: #ffd365;
+    --muted: #9babca;
+    --line: #2b3b56;
+    --panel: #131d30;
+  }
 
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse at top, #213451, transparent 65%),
+      #090e1b;
+    color: #f3f7ff;
+    font-family: system-ui, sans-serif;
+    overscroll-behavior: none;
+  }
+
+  .app {
+    width: min(100%, 500px);
+    height: 100svh;
+    margin: auto;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      12px
+      max(10px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 19px;
+    letter-spacing: 2px;
+  }
+
+  h1 span { color: var(--mint); }
+
+  .small {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .scoreboard {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 14px;
+    background: #121c2fe6;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+
+  .scoreboard strong {
+    margin-left: 7px;
+    font-size: 25px;
+  }
+
+  .player { color: var(--mint); }
+  .computer { color: var(--pink); text-align: right; }
+
+  .mini-power {
+    font-size: 10px;
+    min-height: 15px;
+  }
+
+  .court-space {
+    flex: 1;
+    min-height: 140px;
+    display: grid;
+    place-items: center;
+  }
+
+  .court {
+    position: relative;
+    overflow: hidden;
+    background: #0c1424;
+    border-radius: 15px;
+    box-shadow: 0 0 0 1px #344863, 0 12px 35px #0005;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 14px;
+    text-align: center;
+    background: #07101bdd;
+    backdrop-filter: blur(4px);
+    overflow: auto;
+  }
+
+  .overlay[hidden] { display: none; }
+
+  .overlay h2 {
+    margin: 0 0 8px;
+    font-size: clamp(18px, 5vw, 27px);
+  }
+
+  .overlay p {
+    margin: 0 0 16px;
+    color: #b9c7dc;
+    font-size: 12px;
+    line-height: 1.8;
+    white-space: pre-line;
+  }
+
+  button, select {
+    font: inherit;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #1a2941;
+    color: #f3f7ff;
+    min-height: 42px;
+    padding: 8px 12px;
+  }
+
+  button { cursor: pointer; touch-action: manipulation; }
+  button:disabled { cursor: not-allowed; }
+
+  button:focus-visible,
+  select:focus-visible,
+  input:focus-visible,
+  canvas:focus-visible {
+    outline: 2px solid var(--mint);
+    outline-offset: 3px;
+  }
+
+  .primary {
+    background: var(--mint);
+    color: #07392f;
+    border-color: var(--mint);
+    font-weight: 750;
+  }
+
+  .power-panel {
+    display: grid;
+    grid-template-columns: 1fr 155px;
+    gap: 12px;
+    align-items: center;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: var(--panel);
+    flex-shrink: 0;
+  }
+
+  .power-label {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  #energyText { color: var(--gold); }
+
+  .energy-track {
+    height: 8px;
+    margin-top: 7px;
+    background: #2b3850;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .energy-fill {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--mint), var(--gold));
+    transition: width .2s;
+  }
+
+  .power-button {
+    min-height: 46px;
+    padding: 7px;
+    color: #8e9aac;
+    background: #263047;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .power-button.ready {
+    color: #3a2600;
+    border-color: var(--gold);
+    background: linear-gradient(135deg, #ffe79c, #ffbd42);
+    animation: glow 1.2s infinite alternate;
+  }
+
+  .power-button.armed {
+    color: #ffe7a8;
+    border-color: #ffe7a8;
+    background: #584119;
+    box-shadow: 0 0 18px #ffd36533;
+  }
+
+  @keyframes glow {
+    from { box-shadow: 0 0 5px #ffd36533; }
+    to { box-shadow: 0 0 20px #ffd36577; }
+  }
+
+  .controller {
+    flex-shrink: 0;
+    padding: 8px 13px 3px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: var(--panel);
+  }
+
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    color: var(--mint);
+    font-size: 11px;
+  }
+
+  .control-label span { color: var(--muted); }
+
+  input[type="range"] {
+    --position: 50%;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 44px;
+    margin: 1px 0 0;
+    background: transparent;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 9px;
+    border-radius: 20px;
+    background: linear-gradient(
+      to right,
+      var(--mint) 0%,
+      var(--mint) var(--position),
+      #30425e var(--position),
+      #30425e 100%
+    );
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 40px;
+    height: 29px;
+    margin-top: -10px;
+    border: 3px solid #e1fff9;
+    border-radius: 10px;
+    background: var(--mint);
+    box-shadow: 0 0 14px #65f5dd55;
+  }
+
+  input[type="range"]::-moz-range-track {
+    height: 9px;
+    border-radius: 20px;
+    background: #30425e;
+  }
+
+  input[type="range"]::-moz-range-progress {
+    height: 9px;
+    border-radius: 20px;
+    background: var(--mint);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 34px;
+    height: 23px;
+    border: 3px solid #e1fff9;
+    border-radius: 10px;
+    background: var(--mint);
+  }
+
+  .actions { display: flex; gap: 7px; flex-shrink: 0; }
+  .actions button { flex: 1; font-size: 13px; }
+  .actions select { min-width: 82px; font-size: 12px; }
+
+  .hint {
+    margin: 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  @media (max-height: 680px) {
+    .app { gap: 5px; }
+    h1 { font-size: 16px; }
+    .scoreboard { padding: 2px 12px; }
+    .power-panel { padding: 5px 10px; }
+    .controller { padding-top: 5px; }
+    .hint { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .power-button.ready { animation: none; }
+    .energy-fill { transition: none; }
+  }
+</style>
+</head>
+
+<body>
+<main class="app">
+  <header>
+    <h1>POCKET <span>PONG</span></h1>
+    <span class="small">POWER BATTLE</span>
+  </header>
+
+  <section class="scoreboard" aria-label="คะแนนและพลัง">
+    <div class="player">
+      คุณ <strong id="playerScore">0</strong>
+      <div class="mini-power" id="playerPowerText">POWER 0%</div>
+    </div>
+    <span class="small">7 แต้มชนะ</span>
+    <div class="computer">
+      คอม <strong id="aiScore">0</strong>
+      <div class="mini-power" id="aiPowerText">POWER 0%</div>
+    </div>
+  </section>
+
+  <div class="court-space" id="courtSpace">
+    <div class="court" id="court">
+      <canvas
+        id="canvas"
+        width="420"
+        height="660"
+        tabindex="0"
+        aria-label="สนามปิงปอง คุณควบคุมไม้ด้านล่างด้วยสไลด์หรือลูกศรซ้ายขวา"
+      >เบราว์เซอร์นี้ไม่รองรับ Canvas</canvas>
+
+      <div class="overlay" id="overlay">
+        <div>
+          <h2 id="overlayTitle">พร้อมดวลพลังไหม?</h2>
+          <p id="overlayText">คุณอยู่ด้านล่าง ใช้สไลด์เลื่อนไม้
+รับลูก 5 ครั้งเพื่อชาร์จพลังเต็ม
+กด Power Shoot แล้วตีลูกครั้งถัดไป
+ระวัง! คอมก็ยิงพลังได้เหมือนกัน</p>
+          <button class="primary" id="playButton">เริ่มเกม</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="power-panel" aria-label="พลังพิเศษของคุณ">
+    <div>
+      <div class="power-label">
+        <span>พลังสะสมของคุณ</span>
+        <strong id="energyText">0%</strong>
+      </div>
+      <div
+        class="energy-track"
+        id="energyMeter"
+        role="progressbar"
+        aria-label="พลัง Power Shoot"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <div class="energy-fill" id="energyFill"></div>
+      </div>
+    </div>
+    <button class="power-button" id="powerButton" disabled>
+      ⚡ POWER SHOOT
+    </button>
+  </section>
+
+  <section class="controller">
+    <label class="control-label" for="slider">
+      ← เลื่อนไม้ของคุณ →
+      <span>SLIDE CONTROL</span>
+    </label>
+    <input
+      id="slider"
+      type="range"
+      min="0"
+      max="1000"
+      value="500"
+      step="1"
+      aria-label="ตำแหน่งไม้ ซ้ายไปขวา"
+    >
+  </section>
+
+  <div class="actions">
+    <button id="pauseButton">เริ่มเกม</button>
+    <button id="restartButton">เริ่มใหม่</button>
+    <select id="difficulty" aria-label="ความยาก เปลี่ยนแล้วเริ่มเกมใหม่">
+      <option value="easy">ง่าย</option>
+      <option value="normal" selected>ปกติ</option>
+      <option value="hard">ยาก</option>
+    </select>
+  </div>
+
+  <p class="hint">
+    รับลูก +20% · ← → / A D เคลื่อนที่ · P ใช้พลัง · Space พัก
+  </p>
+  <div id="announcement" class="sr-only"
+       role="status" aria-live="polite"></div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const canvas = $("canvas");
+  const ctx = canvas.getContext("2d");
+  const slider = $("slider");
+
+  if (!ctx) {
+    $("overlayTitle").textContent = "ไม่รองรับ Canvas";
+    $("overlayText").textContent = "กรุณาเปิดด้วยเบราว์เซอร์รุ่นใหม่";
+    return;
+  }
+
+  const W = 420, H = 660;
+  const PW = 88, PH = 13, R = 8;
+  const MAX_X = W - PW;
+  const WIN_SCORE = 7;
+  const CHARGE = 20;
+  const MAX_NORMAL_SPEED = 680;
+  const MAX_POWER_SPEED = 1100;
+
+  const levels = {
+    easy:   { aiSpeed: 165, ballSpeed: 285, error: 55 },
+    normal: { aiSpeed: 235, ballSpeed: 340, error: 32 },
+    hard:   { aiSpeed: 310, ballSpeed: 395, error: 14 }
+  };
+
+  const player = {
+    x: MAX_X / 2, y: H - 52,
+    score: 0, energy: 0, armed: false
+  };
+
+  const ai = {
+    x: MAX_X / 2, y: 31,
+    score: 0, energy: 0, armed: false
+  };
+
+  const ball = {
+    x: W / 2, y: H / 2,
+    vx: 0, vy: 0,
+    speed: 340,
+    normalSpeed: 340,
+    powerOwner: null
+  };
+
+  let state = "ready";
+  let serveDelay = 0;
+  let lastTime = 0;
+  let gameTime = 0;
+  let aiTimer = 0;
+  let aiError = 0;
+  let flash = 0;
+  let flashRGB = "255,211,101";
+  let particles = [];
+  let trail = [];
+  let floatingText = "";
+  let floatingColor = "#ffd365";
+  let floatingTimer = 0;
+
+  const keys = new Set();
+  const reducedMotion = matchMedia(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const settings = () => levels[$("difficulty").value];
+  const moveToward = (v, target, step) =>
+    v + clamp(target - v, -step, step);
+
+  function announce(text) {
+    $("announcement").textContent = text;
+  }
+
+  function focusCourt() {
+    canvas.focus({ preventScroll: true });
+  }
+
+  function setPlayerX(x) {
+    player.x = clamp(x, 0, MAX_X);
+    const percent = player.x / MAX_X * 100;
+    slider.value = String(Math.round(percent * 10));
+    slider.style.setProperty("--position", percent + "%");
+  }
+
+  function updateScores() {
+    $("playerScore").textContent = player.score;
+    $("aiScore").textContent = ai.score;
+    announce(`คุณ ${player.score} คะแนน คอม ${ai.score} คะแนน`);
+  }
+
+  function syncPowerUI() {
+    const usable = state === "playing" &&
+      player.energy === 100 && !player.armed;
+
+    $("energyText").textContent = player.energy + "%";
+    $("energyFill").style.width = player.energy + "%";
+    $("energyMeter").setAttribute(
+      "aria-valuenow", String(player.energy)
+    );
+
+    $("playerPowerText").textContent = player.armed
+      ? "⚡ พร้อมยิง!"
+      : `POWER ${player.energy}%`;
+
+    $("aiPowerText").textContent = ai.armed
+      ? "⚡ พร้อมยิง!"
+      : `POWER ${ai.energy}%`;
+
+    const button = $("powerButton");
+    button.disabled = !usable;
+    button.classList.toggle("ready", usable);
+    button.classList.toggle("armed", player.armed);
+    button.textContent = player.armed
+      ? "⚡ พร้อมยิงลูกถัดไป"
+      : "⚡ POWER SHOOT";
+  }
+
+  function showFloating(text, color = "#ffd365") {
+    floatingText = text;
+    floatingColor = color;
+    floatingTimer = 1.2;
+  }
+
+  function chargePower(paddle) {
+    const old = paddle.energy;
+    paddle.energy = Math.min(100, paddle.energy + CHARGE);
+
+    if (paddle.energy === 100 && old < 100) {
+      if (paddle === player) {
+        showFloating("POWER READY!");
+        announce("พลังคุณเต็มแล้ว กด Power Shoot เพื่อเตรียมยิง");
+      } else {
+        showFloating("คอมพลังเต็มแล้ว!", "#ff8dbd");
+        announce("ระวัง คอมพิวเตอร์มีพลังเต็มแล้ว");
+      }
+    }
+
+    syncPowerUI();
+  }
+
+  function armPlayerPower() {
+    if (
+      state !== "playing" ||
+      player.energy < 100 ||
+      player.armed
+    ) return;
+
+    player.armed = true;
+    showFloating("รับลูกเพื่อปล่อยพลัง!");
+    announce("เตรียมยิงพลังแล้ว รับลูกครั้งถัดไปเพื่อปล่อยพลัง");
+    syncPowerUI();
+  }
+
+  function prepareAIPower() {
+    if (
+      state === "playing" &&
+      serveDelay <= 0 &&
+      ai.energy === 100 &&
+      !ai.armed &&
+      ball.vy < 0
+    ) {
+      ai.armed = true;
+      syncPowerUI();
+    }
+  }
+
+  function showOverlay(title, text, buttonText) {
+    $("overlayTitle").textContent = title;
+    $("overlayText").textContent = text;
+    $("playButton").textContent = buttonText;
+    $("overlay").hidden = false;
+  }
+
+  function resetBall(direction) {
+    ball.x = W / 2;
+    ball.y = H / 2;
+    ball.normalSpeed = settings().ballSpeed;
+    ball.speed = ball.normalSpeed;
+    ball.powerOwner = null;
+
+    const angle = (Math.random() - 0.5) * 0.85;
+    ball.vx = Math.sin(angle) * ball.speed;
+    ball.vy = Math.cos(angle) * ball.speed * direction;
+
+    serveDelay = 0.85;
+    aiTimer = 0;
+    trail = [];
+  }
+
+  function startGame() {
+    for (const paddle of [player, ai]) {
+      paddle.x = MAX_X / 2;
+      paddle.score = 0;
+      paddle.energy = 0;
+      paddle.armed = false;
+    }
+
+    keys.clear();
+    particles = [];
+    flash = 0;
+    floatingTimer = 0;
+
+    setPlayerX(MAX_X / 2);
+    updateScores();
+    resetBall(1);
+
+    state = "playing";
+    $("overlay").hidden = true;
+    $("pauseButton").textContent = "พักเกม";
+    syncPowerUI();
+  }
+
+  function pauseGame() {
+    keys.clear();
+    if (state !== "playing") return;
+
+    state = "paused";
+    $("pauseButton").textContent = "เล่นต่อ";
+    showOverlay("พักเกม", "พลังสะสมยังอยู่ พร้อมแล้วกดเล่นต่อ", "เล่นต่อ");
+    syncPowerUI();
+  }
+
+  function toggleGame() {
+    if (state === "playing") {
+      pauseGame();
+    } else if (state === "paused") {
+      state = "playing";
+      $("overlay").hidden = true;
+      $("pauseButton").textContent = "พักเกม";
+      syncPowerUI();
+    } else {
+      startGame();
+    }
+  }
+
+  function burst(x, y, color, powerful = false) {
+    const count = reducedMotion ? 4 : powerful ? 30 : 10;
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * (powerful ? 260 : 130);
+      const life = powerful ? 0.6 : 0.35;
+
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life,
+        maxLife: life,
+        color
+      });
+    }
+  }
+
+  function bounce(paddle, direction) {
+    const isPlayer = paddle === player;
+    const usePower = paddle.armed && paddle.energy === 100;
+
+    const hit = clamp(
+      (ball.x - (paddle.x + PW / 2)) / (PW / 2),
+      -1, 1
+    );
+
+    const angle = hit * Math.PI / 3;
+
+    // ความเร็วพื้นฐานแยกจากความเร็วพลังพิเศษ
+    ball.normalSpeed = Math.min(
+      ball.normalSpeed * 1.045,
+      MAX_NORMAL_SPEED
+    );
+
+    ball.powerOwner = usePower
+      ? (isPlayer ? "player" : "ai")
+      : null;
+
+    ball.speed = usePower
+      ? Math.min(ball.normalSpeed * 1.8, MAX_POWER_SPEED)
+      : ball.normalSpeed;
+
+    if (usePower) {
+      paddle.energy = 0;
+      paddle.armed = false;
+      flash = reducedMotion ? 0 : 0.22;
+      flashRGB = isPlayer ? "255,211,101" : "255,101,179";
+
+      showFloating(
+        isPlayer ? "POWER SHOOT!" : "ระวัง! COM POWER!",
+        isPlayer ? "#ffd365" : "#ff8dbd"
+      );
+
+      announce(isPlayer
+        ? "คุณปล่อย Power Shoot"
+        : "คอมพิวเตอร์ยิง Power Shoot");
+
+      syncPowerUI();
+    } else {
+      chargePower(paddle);
+    }
+
+    ball.vx = Math.sin(angle) * ball.speed;
+    ball.vy = Math.cos(angle) * ball.speed * direction;
+
+    ball.y = direction < 0
+      ? paddle.y - R
+      : paddle.y + PH + R;
+
+    trail = [];
+
+    burst(
+      ball.x,
+      ball.y,
+      usePower
+        ? (isPlayer ? "#ffd365" : "#ff65b3")
+        : (isPlayer ? "#65f5dd" : "#ff8dbd"),
+      usePower
+    );
+  }
+
+  function scorePoint(winner) {
+    winner.score++;
+    updateScores();
+
+    // พลังเก็บข้ามแต้ม แต่ต้องเตรียมยิงใหม่
+    player.armed = false;
+    ai.armed = false;
+
+    if (winner.score >= WIN_SCORE) {
+      state = "over";
+      keys.clear();
+      $("pauseButton").textContent = "เล่นอีกครั้ง";
+
+      const title = winner === player
+        ? "คุณชนะแล้ว!"
+        : "คอมพิวเตอร์ชนะ!";
+
+      showOverlay(
+        title,
+        `คะแนน ${player.score} : ${ai.score}`,
+        "เล่นอีกครั้ง"
+      );
+
+      announce(`${title} คะแนน ${player.score} ต่อ ${ai.score}`);
+    } else {
+      resetBall(winner === player ? -1 : 1);
+    }
+
+    syncPowerUI();
+  }
+
+  function update(dt) {
+    if (state !== "playing") return;
+
+    gameTime += dt;
+    flash = Math.max(0, flash - dt);
+    floatingTimer = Math.max(0, floatingTimer - dt);
+
+    const left = keys.has("arrowleft") || keys.has("a");
+    const right = keys.has("arrowright") || keys.has("d");
+
+    if (left || right) {
+      setPlayerX(
+        player.x + ((right ? 1 : 0) - (left ? 1 : 0)) * 440 * dt
+      );
+    }
+
+    aiTimer -= dt;
+    if (aiTimer <= 0) {
+      aiError = (Math.random() - 0.5) * settings().error * 2;
+      aiTimer = 0.28;
+    }
+
+    const target = ball.vy < 0
+      ? ball.x - PW / 2 + aiError
+      : MAX_X / 2;
+
+    ai.x = clamp(
+      moveToward(ai.x, target, settings().aiSpeed * dt),
+      0, MAX_X
+    );
+
+    particles.forEach(p => {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt;
+    });
+    particles = particles.filter(p => p.life > 0);
+
+    if (serveDelay > 0) {
+      serveDelay -= dt;
+      return;
+    }
+
+    prepareAIPower();
+
+    trail.unshift({
+      x: ball.x,
+      y: ball.y,
+      owner: ball.powerOwner
+    });
+
+    const maxTrail = ball.powerOwner ? 18 : 10;
+    if (trail.length > maxTrail) trail.length = maxTrail;
+
+    // ย่อยการเคลื่อนที่ ป้องกันลูกเร็วทะลุไม้
+    const steps = Math.max(
+      1, Math.ceil(MAX_POWER_SPEED * dt / 4)
+    );
+    const step = dt / steps;
+
+    for (let i = 0; i < steps; i++) {
+      ball.x += ball.vx * step;
+      ball.y += ball.vy * step;
+
+      if (ball.x < R) {
+        ball.x = R;
+        ball.vx = Math.abs(ball.vx);
+      } else if (ball.x > W - R) {
+        ball.x = W - R;
+        ball.vx = -Math.abs(ball.vx);
+      }
+
+      if (
+        ball.vy > 0 &&
+        ball.y + R >= player.y &&
+        ball.y - R <= player.y + PH &&
+        ball.x + R >= player.x &&
+        ball.x - R <= player.x + PW
+      ) {
+        bounce(player, -1);
+      }
+
+      if (
+        ball.vy < 0 &&
+        ball.y - R <= ai.y + PH &&
+        ball.y + R >= ai.y &&
+        ball.x + R >= ai.x &&
+        ball.x - R <= ai.x + PW
+      ) {
+        bounce(ai, 1);
+      }
+
+      if (ball.y < -R) {
+        scorePoint(player);
+        break;
+      }
+
+      if (ball.y > H + R) {
+        scorePoint(ai);
+        break;
+      }
+    }
+  }
+
+  function drawPaddle(paddle, isPlayer) {
+    const color = isPlayer
+      ? (paddle.armed ? "#ffd365" : "#65f5dd")
+      : (paddle.armed ? "#ffb6dc" : "#ff8dbd");
+
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.fillRect(paddle.x, paddle.y, PW, PH);
+    ctx.restore();
+
+    // แถบพลังอยู่บนผิวไม้
+    const x = paddle.x + 4;
+    const y = paddle.y + 4;
+    const width = PW - 8;
+
+    ctx.fillStyle = isPlayer ? "#082c30" : "#482039";
+    ctx.fillRect(x, y, width, 5);
+
+    if (paddle.energy > 0) {
+      ctx.save();
+      ctx.globalAlpha = paddle.energy === 100 && !reducedMotion
+        ? 0.7 + Math.sin(gameTime * 9) * 0.3
+        : 1;
+
+      ctx.fillStyle = isPlayer ? "#ffd365" : "#ffe0f2";
+      ctx.shadowColor = isPlayer ? "#ffd365" : "#ff65b3";
+      ctx.shadowBlur = paddle.energy === 100 ? 14 : 0;
+      ctx.fillRect(x, y, width * paddle.energy / 100, 5);
+      ctx.restore();
+    }
+
+    ctx.font = "bold 10px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillStyle = isPlayer ? "#d6e6b0" : "#e9b9d2";
+    ctx.fillText(
+      paddle.armed ? "POWER ARMED" : `POWER ${paddle.energy}%`,
+      paddle.x + PW / 2,
+      paddle.y + PH + 17
+    );
+
+    if (paddle.armed) {
+      ctx.save();
+      ctx.strokeStyle = isPlayer ? "#ffe7a8" : "#ffe0f2";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 20;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(paddle.x - 3, paddle.y - 3, PW + 6, PH + 6);
+      ctx.restore();
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = "#0c1424";
+    ctx.fillRect(0, 0, W, H);
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, H);
+    gradient.addColorStop(0, ai.armed ? "#ff65b322" : "#ff8dbd0d");
+    gradient.addColorStop(0.5, "#0c1424");
+    gradient.addColorStop(1, player.armed ? "#ffd36522" : "#65f5dd0d");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.strokeStyle = "#ffffff05";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+
+    for (let x = 30; x < W; x += 30) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+    }
+    for (let y = 30; y < H; y += 30) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+    }
+    ctx.stroke();
+
+    ctx.save();
+    ctx.strokeStyle = "#9bb4d544";
+    ctx.setLineDash([8, 10]);
+    ctx.beginPath();
+    ctx.moveTo(0, H / 2);
+    ctx.lineTo(W, H / 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = "#9bb4d51f";
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, 48, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.font = "11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ff8dbd88";
+    ctx.fillText("COMPUTER", W / 2, 18);
+
+    drawPaddle(ai, false);
+    drawPaddle(player, true);
+
+    if (!reducedMotion) {
+      trail.forEach((p, i) => {
+        const fraction = 1 - i / trail.length;
+        ctx.globalAlpha = fraction * (p.owner ? 0.65 : 0.25);
+        ctx.fillStyle = p.owner
+          ? (p.owner === "ai" ? "#ff65b3" : "#ffc247")
+          : "#c8e9ff";
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, R * Math.max(0.15, fraction), 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+    ctx.globalAlpha = 1;
+
+    const powered = Boolean(ball.powerOwner);
+    const aiShot = ball.powerOwner === "ai";
+    const powerColor = aiShot ? "#ff65b3" : "#ffbd42";
+
+    ctx.save();
+    ctx.fillStyle = powered
+      ? (aiShot ? "#ffe0f2" : "#fff1b8")
+      : "#ffffff";
+    ctx.shadowColor = powered ? powerColor : "#bcecff";
+    ctx.shadowBlur = powered ? 30 : 18;
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, powered ? R + 2 : R, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (powered) {
+      ctx.strokeStyle = powerColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, R + 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    particles.forEach(p => {
+      ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 3, 3);
+    });
+    ctx.globalAlpha = 1;
+
+    if (flash > 0) {
+      ctx.fillStyle = `rgba(${flashRGB},${flash * 0.45})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (floatingTimer > 0) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, floatingTimer * 2);
+      ctx.fillStyle = floatingColor;
+      ctx.shadowColor = floatingColor;
+      ctx.shadowBlur = 12;
+      ctx.font = "bold 20px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(floatingText, W / 2, H / 2 - 85);
+      ctx.restore();
+    }
+
+    if (serveDelay > 0 && state === "playing") {
+      ctx.fillStyle = "#c0cee1";
+      ctx.font = "14px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("เตรียมรับลูก...", W / 2, H / 2 + 78);
+    }
+  }
+
+  function resize() {
+    const space = $("courtSpace");
+    const court = $("court");
+
+    const scale = Math.min(
+      Math.max(1, space.clientWidth - 2) / W,
+      Math.max(1, space.clientHeight - 2) / H
+    );
+
+    court.style.width = W * scale + "px";
+    court.style.height = H * scale + "px";
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(W * scale * dpr));
+    canvas.height = Math.max(1, Math.round(H * scale * dpr));
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    draw();
+  }
+
+  slider.addEventListener("input", () => {
+    setPlayerX(Number(slider.value) / 1000 * MAX_X);
+  });
+
+  function controlFromPointer(event) {
+    if (state !== "playing") return;
+    const rect = canvas.getBoundingClientRect();
+    setPlayerX((event.clientX - rect.left) / rect.width * W - PW / 2);
+  }
+
+  canvas.addEventListener("pointerdown", event => {
+    canvas.setPointerCapture(event.pointerId);
+    focusCourt();
+    controlFromPointer(event);
+  });
+
+  canvas.addEventListener("pointermove", event => {
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      controlFromPointer(event);
+    }
+  });
+
+  window.addEventListener("keydown", event => {
+    const key = event.key.toLowerCase();
+    const target = event.target;
+    const editable = target.closest("textarea, [contenteditable='true']") ||
+      (target.matches("input") && target.type !== "range");
+
+    if (editable) return;
+
+    if (key === "p") {
+      event.preventDefault();
+      if (!event.repeat) armPlayerPower();
+      return;
+    }
+
+    // ลูกศรบนสไลด์ยังทำงานตามมาตรฐานของเบราว์เซอร์
+    if (target.closest("input, select, button")) return;
+
+    if (["arrowleft", "arrowright", "a", "d"].includes(key)) {
+      event.preventDefault();
+      keys.add(key);
+    }
+
+    if (key === " " && !event.repeat) {
+      event.preventDefault();
+      toggleGame();
+    }
+  });
+
+  window.addEventListener("keyup", event => {
+    keys.delete(event.key.toLowerCase());
+  });
+
+  $("powerButton").addEventListener("click", () => {
+    armPlayerPower();
+    focusCourt();
+  });
+
+  $("playButton").addEventListener("click", () => {
+    toggleGame();
+    focusCourt();
+  });
+
+  $("pauseButton").addEventListener("click", () => {
+    toggleGame();
+    focusCourt();
+  });
+
+  $("restartButton").addEventListener("click", () => {
+    if (state === "playing" || state === "paused") {
+      pauseGame();
+      if (!confirm("เริ่มใหม่และล้างคะแนนกับพลังสะสมใช่ไหม?")) return;
+    }
+    startGame();
+    focusCourt();
+  });
+
+  $("difficulty").addEventListener("change", () => {
+    startGame();
+    focusCourt();
+  });
+
+  window.addEventListener("blur", pauseGame);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pauseGame();
+  });
+
+  if ("ResizeObserver" in window) {
+    const observer = new ResizeObserver(resize);
+    observer.observe($("courtSpace"));
+  } else {
+    window.addEventListener("resize", resize);
+  }
+
+  function loop(time) {
+    const dt = Math.min((time - lastTime) / 1000 || 0, 0.035);
+    lastTime = time;
+    update(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  setPlayerX(MAX_X / 2);
+  syncPowerUI();
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+  </html>
