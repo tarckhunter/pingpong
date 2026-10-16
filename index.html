@@ -492,7 +492,88 @@
     return;
   }
 
-  // ขนาดสนามและกติกาเดิม
+  // ===== ระบบเสียงตีลูก =====
+  let audioContext = null;
+
+  function unlockAudio() {
+    try {
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+
+      if (!AudioContextClass) return;
+
+      if (!audioContext) {
+        audioContext = new AudioContextClass();
+      }
+
+      if (audioContext.state === "suspended") {
+        audioContext.resume().catch(() => {});
+      }
+    } catch {
+      // หากเบราว์เซอร์ไม่รองรับ เกมยังเล่นต่อได้
+    }
+  }
+
+  document.addEventListener("pointerdown", unlockAudio, {
+    capture: true,
+    passive: true
+  });
+
+  document.addEventListener("keydown", unlockAudio, {
+    capture: true
+  });
+
+  function playHitSound(isPower, isPlayer) {
+    if (!audioContext || audioContext.state !== "running") return;
+
+    try {
+      const now = audioContext.currentTime;
+      const duration = isPower ? 0.24 : 0.085;
+
+      const oscillator = audioContext.createOscillator();
+      const volume = audioContext.createGain();
+
+      const startFrequency = isPower
+        ? (isPlayer ? 460 : 370)
+        : (isPlayer ? 760 : 620);
+
+      oscillator.type = isPower ? "triangle" : "sine";
+
+      oscillator.frequency.setValueAtTime(startFrequency, now);
+      oscillator.frequency.exponentialRampToValueAtTime(
+        isPower ? 65 : 240,
+        now + duration
+      );
+
+      volume.gain.setValueAtTime(0, now);
+      volume.gain.linearRampToValueAtTime(
+        isPower ? 0.26 : 0.17,
+        now + 0.004
+      );
+      volume.gain.exponentialRampToValueAtTime(
+        0.001,
+        now + duration
+      );
+      volume.gain.linearRampToValueAtTime(
+        0,
+        now + duration + 0.01
+      );
+
+      oscillator.connect(volume);
+      volume.connect(audioContext.destination);
+
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.02);
+
+      oscillator.onended = () => {
+        oscillator.disconnect();
+        volume.disconnect();
+      };
+    } catch {
+      // ป้องกันข้อผิดพลาดด้านเสียงรบกวนการทำงาน
+    }
+  }
+
   const W = 420;
   const H = 660;
   const PW = 88;
@@ -558,7 +639,20 @@
   const clamp = (value, min, max) =>
     Math.max(min, Math.min(max, value));
 
-  const settings = () => levels[$("difficulty").value];
+  // โหมด POWER ทั้งเกม: คอมความเร็ว ×2 และความคลาดเคลื่อนลดลงครึ่งหนึ่ง
+  const settings = () => {
+    const base = levels[$("difficulty").value];
+
+    if (!alwaysPower.checked) {
+      return base;
+    }
+
+    return {
+      ...base,
+      aiSpeed: base.aiSpeed * 2,
+      error: base.error / 2
+    };
+  };
 
   const moveToward = (value, target, step) =>
     value + clamp(target - value, -step, step);
@@ -730,7 +824,6 @@
     updateScores();
     resetBall(1);
 
-    // คงโหมดที่ผู้เล่นเลือกไว้
     state = "playing";
     $("overlay").hidden = true;
     $("pauseButton").textContent = "พักเกม";
@@ -794,6 +887,8 @@
     const usePower = unlimited ||
       (paddle.armed && paddle.energy === 100);
 
+    playHitSound(usePower, isPlayer);
+
     const hit = clamp(
       (ball.x - (paddle.x + PW / 2)) / (PW / 2),
       -1,
@@ -816,7 +911,6 @@
       : ball.normalSpeed;
 
     if (usePower) {
-      // โหมดทั้งเกมไม่ใช้พลังสะสม
       if (!unlimited) {
         paddle.energy = 0;
         paddle.armed = false;
@@ -866,7 +960,6 @@
     winner.score++;
     updateScores();
 
-    // พลังเก็บข้ามแต้ม แต่ยกเลิกสถานะเตรียมยิง
     player.armed = false;
     ai.armed = false;
 
@@ -951,7 +1044,6 @@
     const maxTrail = ball.powerOwner ? 18 : 10;
     if (trail.length > maxTrail) trail.length = maxTrail;
 
-    // ย่อยการเคลื่อนที่เพื่อป้องกันลูกเร็วทะลุไม้
     const steps = Math.max(
       1,
       Math.ceil(MAX_POWER_SPEED * dt / 4)
@@ -1019,7 +1111,6 @@
     ctx.fillRect(paddle.x, paddle.y, PW, PH);
     ctx.restore();
 
-    // แถบชาร์จบนไม้
     const x = paddle.x + 4;
     const y = paddle.y + 4;
     const width = PW - 8;
@@ -1241,13 +1332,12 @@
     draw();
   }
 
-  // เปิด–ปิดโหมดโดยไม่รีเซ็ตคะแนนหรือพลังสะสม
-  // ลูกที่กำลังบินจะคงสภาพเดิมจนกว่าจะชนไม้ครั้งถัดไป
   alwaysPower.addEventListener("change", () => {
     syncPowerUI();
+    aiTimer = 0;
 
     const message = alwaysPower.checked
-      ? "เปิด POWER ทั้งเกม!"
+      ? "เปิด POWER ทั้งเกม (คอมเก่งขึ้น x2)!"
       : "กลับสู่โหมดสะสมพลัง";
 
     showFloating(message);
@@ -1299,7 +1389,6 @@
       return;
     }
 
-    // คงการควบคุมปุ่มและ input ด้วยคีย์บอร์ดตามปกติ
     if (target.closest("input, select, button")) return;
 
     if (["arrowleft", "arrowright", "a", "d"].includes(key)) {
